@@ -57,8 +57,7 @@ class Ctags {
       '!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted, 2=foldcase/'
     ];
 
-    Future.wait(dirs.map(addFileSystemEntity))
-        .then((Iterable<Iterable<Iterable<String>>> files) {
+    Future.wait(dirs.map(addFileSystemEntity)).then((Iterable<Iterable<Iterable<String>>> files) {
       files.forEach((Iterable<Iterable<String>> file) {
         file.forEach((Iterable<String> fileLines) => lines.addAll(fileLines));
       });
@@ -89,8 +88,7 @@ class Ctags {
       }).toList());
     } else if (type == FileSystemEntityType.file) {
       return Future.value([await parseFile(File(name))]);
-    } else if (type == FileSystemEntityType.link &&
-        options['follow-links'] as bool) {
+    } else if (type == FileSystemEntityType.link && options['follow-links'] as bool) {
       return addFileSystemEntity(Link(name).targetSync());
     } else {
       return Future.value([]);
@@ -113,9 +111,9 @@ class Ctags {
     final lines = <List<String>>[];
     ParseStringResult result;
     CompilationUnit unit;
+
     try {
-      result =
-          an.parseFile(path: file.path, featureSet: FeatureSet.fromEnableFlags([]));
+      result = an.parseFile(path: file.path, featureSet: FeatureSet.fromEnableFlags([]));
       unit = result.unit;
     } catch (e) {
       print('ERROR: unable to generate tags for ${file.path}');
@@ -129,17 +127,17 @@ class Ctags {
         '/import/;"',
         'i',
         options['line-numbers'] as bool
-            ? 'line:${unit.lineInfo.getLocation(unit.directives[0].offset).lineNumber}'
+            ? 'line:${unit.lineInfo!.getLocation(unit.directives[0].offset).lineNumber}'
             : '',
         'type:directives',
       ]);
     }
 
-    final project = options['project'] as String;
+    final project = options['project'] as String?;
 
     // import, export, part, part of, library directives
     await Future.forEach(unit.directives, (Directive d) async {
-      String tag, importDirective, display;
+      late String tag, importDirective, display;
 
       if (d is ImportDirective) {
         display = d.childEntities
@@ -177,8 +175,7 @@ class Ctags {
       } else if (d is PartOfDirective) {
         tag = 'p';
         display = d.childEntities
-            .where((element) =>
-                '$element' != 'part' && '$element' != 'of' && '$element' != ';')
+            .where((element) => '$element' != 'part' && '$element' != 'of' && '$element' != ';')
             .join(' ')
             .trim();
       } else if (d is LibraryDirective) {
@@ -198,7 +195,7 @@ class Ctags {
         '/^;"',
         tag,
         options['line-numbers'] as bool
-            ? 'line:${unit.lineInfo.getLocation(d.offset).lineNumber}'
+            ? 'line:${unit.lineInfo!.getLocation(d.offset).lineNumber}'
             : '',
         importDirective
       ]);
@@ -209,11 +206,11 @@ class Ctags {
         lines.add([
           declaration.name.name,
           path.relative(file.path, from: root),
-          '/${miXin.matchAsPrefix(declaration.toSource())[0]}/;"',
+          '/${miXin.matchAsPrefix(declaration.toSource())![0]}/;"',
           'x',
           'access:${declaration.name.name[0] == '_' ? 'private' : 'public'}',
           options['line-numbers'] as bool
-              ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+              ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
               : '',
           'type:mixin',
         ]);
@@ -226,18 +223,18 @@ class Ctags {
               name = declaration.name.name;
               offset = declaration.offset;
             } else {
-              name = member.name.name;
+              name = member.name!.name;
               offset = member.offset;
             }
 
             lines.add([
               name,
               path.relative(file.path, from: root),
-              '/${constructor.matchAsPrefix(member.toSource())[0]}/;"',
+              '/${constructor.matchAsPrefix(member.toSource())![0]}/;"',
               'r',
               'access:${name[0] == '_' ? 'private' : 'public'}',
               options['line-numbers'] as bool
-                  ? 'line:${unit.lineInfo.getLocation(offset).lineNumber}'
+                  ? 'line:${unit.lineInfo!.getLocation(offset).lineNumber}'
                   : '',
               'mixin:{declaration.name}',
               'signature:${member.parameters.toString()}',
@@ -247,13 +244,13 @@ class Ctags {
               var memberSource = member.toSource();
 
               lines.add([
-                variable.name.name,
+                variable.name.name.toString(),
                 path.relative(file.path, from: root),
-                '/${memberSource}/;"',
+                '/$memberSource/;"',
                 'f',
                 'access:${variable.name.name[0] == '_' ? 'private' : 'public'}',
                 options['line-numbers'] as bool
-                    ? 'line:${unit.lineInfo.getLocation(member.offset).lineNumber}'
+                    ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
                     : '',
                 'mixin:{declaration.name}',
                 'type:${_parseFieldType(memberSource)}'
@@ -283,13 +280,63 @@ class Ctags {
             lines.add([
               member.name.name,
               path.relative(file.path, from: root),
-              '/${method.matchAsPrefix(memberSource)[0]}/;"',
+              '/${method.matchAsPrefix(memberSource)![0]}/;"',
               tag,
               'access:${member.name.name[0] == '_' ? 'private' : 'public'}',
               options['line-numbers'] as bool
-                  ? 'line:${unit.lineInfo.getLocation(member.offset).lineNumber}'
+                  ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
                   : '',
               'mixin:${declaration.name}',
+              'signature:${tag == 'g' ? '' : member.parameters.toString()}',
+              'type:${member.returnType.toString()}'
+            ]);
+          }
+        });
+      } else if (declaration is ExtensionDeclaration) {
+        lines.add([
+          '${declaration.name!.name} on ${declaration.extendedType}',
+          path.relative(file.path, from: root),
+          '/${klass.matchAsPrefix(declaration.toSource())![0]}/;"',
+          'X',
+          'access:${declaration.name?.name[0] == '_' ? 'private' : 'public'}',
+          options['line-numbers'] as bool
+              ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
+              : '',
+          'type:extension',
+        ]);
+
+        declaration.members.forEach((member) {
+          if (member is MethodDeclaration) {
+            var tag = 'm';
+            if (member.isStatic) {
+              tag = 'M';
+            }
+            // better if static is least preferred
+            if (member.isOperator) {
+              tag = 'o';
+            }
+            if (member.isGetter) {
+              tag = 'g';
+            }
+            if (member.isSetter) {
+              tag = 's';
+            }
+            if (member.isAbstract) {
+              tag = 'a';
+            }
+
+            var memberSource = member.toSource();
+
+            lines.add([
+              member.name.name,
+              path.relative(file.path, from: root),
+              '/${method.matchAsPrefix(memberSource)![0]}/;"',
+              tag,
+              'access:${member.name.name[0] == '_' ? 'private' : 'public'}',
+              options['line-numbers'] as bool
+                  ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
+                  : '',
+              'extension:${declaration.name!.name} on ${declaration.extendedType}',
               'signature:${tag == 'g' ? '' : member.parameters.toString()}',
               'type:${member.returnType.toString()}'
             ]);
@@ -303,7 +350,7 @@ class Ctags {
           'F',
           'access:${declaration.name.name[0] == '_' ? 'private' : 'public'}',
           options['line-numbers'] as bool
-              ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+              ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
               : '',
           'signature:${declaration.functionExpression.parameters.toString()}',
           'type:${declaration.returnType.toString()}'
@@ -320,7 +367,7 @@ class Ctags {
             '${isConst ? 'C' : 'v'}',
             'access:${v.name.name[0] == '_' ? 'private' : 'public'}',
             options['line-numbers'] as bool
-                ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+                ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
                 : '',
             'type:${varType == 'null' ? isConst ? '' : declaration.variables.keyword.toString() : varType}'
           ]);
@@ -329,11 +376,11 @@ class Ctags {
         lines.add([
           declaration.name.name,
           path.relative(file.path, from: root),
-          '/${enumeration.matchAsPrefix(declaration.toSource())[0]}/;"',
+          '/${enumeration.matchAsPrefix(declaration.toSource())![0]}/;"',
           'E',
           'access:${declaration.name.name[0] == '_' ? 'private' : 'public'}',
           options['line-numbers'] as bool
-              ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+              ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
               : '',
           'type:enum',
         ]);
@@ -351,10 +398,10 @@ class Ctags {
           lines.add([
             name,
             path.relative(file.path, from: root),
-            '/${enumeration.matchAsPrefix(constant.toSource())[0]}/;"',
+            '/${enumeration.matchAsPrefix(constant.toSource())![0]}/;"',
             'e',
             options['line-numbers'] as bool
-                ? 'line:${unit.lineInfo.getLocation(offset).lineNumber}'
+                ? 'line:${unit.lineInfo!.getLocation(offset).lineNumber}'
                 : '',
             'enum:${declaration.name}',
           ]);
@@ -363,17 +410,17 @@ class Ctags {
         lines.add([
           declaration.name.name,
           path.relative(file.path, from: root),
-          '/${klass.matchAsPrefix(declaration.toSource())[0]}/;"',
+          '/${klass.matchAsPrefix(declaration.toSource())![0]}/;"',
           'c',
           'access:${declaration.name.name[0] == '_' ? 'private' : 'public'}',
           options['line-numbers'] as bool
-              ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+              ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
               : '',
           'type:${declaration.isAbstract ? 'abstract ' : ''}class',
         ]);
 
         // extends tag
-        declaration.extendsClause?.childEntities?.forEach((c) {
+        declaration.extendsClause?.childEntities.forEach((c) {
           switch (c.toString()) {
             case 'extends':
               break;
@@ -384,7 +431,7 @@ class Ctags {
                 '/$c/;"',
                 'd',
                 options['line-numbers'] as bool
-                    ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+                    ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
                     : '',
                 'class:${declaration.name}',
               ]);
@@ -392,7 +439,7 @@ class Ctags {
         });
 
         // with tag
-        declaration.withClause?.childEntities?.forEach((c) {
+        declaration.withClause?.childEntities.forEach((c) {
           switch (c.toString()) {
             case 'with':
               break;
@@ -403,7 +450,7 @@ class Ctags {
                 '/$c/;"',
                 'w',
                 options['line-numbers'] as bool
-                    ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+                    ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
                     : '',
                 'class:${declaration.name}',
               ]);
@@ -411,7 +458,7 @@ class Ctags {
         });
 
         // implements tag
-        declaration.implementsClause?.childEntities?.forEach((c) {
+        declaration.implementsClause?.childEntities.forEach((c) {
           switch (c.toString()) {
             case 'implements':
               break;
@@ -422,7 +469,7 @@ class Ctags {
                 '/$c/;"',
                 'z',
                 options['line-numbers'] as bool
-                    ? 'line:${unit.lineInfo.getLocation(declaration.offset).lineNumber}'
+                    ? 'line:${unit.lineInfo!.getLocation(declaration.offset).lineNumber}'
                     : '',
                 'class:${declaration.name}',
               ]);
@@ -437,18 +484,18 @@ class Ctags {
               name = declaration.name.name;
               offset = declaration.offset;
             } else {
-              name = member.name.name;
+              name = member.name!.name;
               offset = member.offset;
             }
 
             lines.add([
               name,
               path.relative(file.path, from: root),
-              '/${constructor.matchAsPrefix(member.toSource())[0]}/;"',
+              '/${constructor.matchAsPrefix(member.toSource())![0]}/;"',
               'r',
               'access:${name[0] == '_' ? 'private' : 'public'}',
               options['line-numbers'] as bool
-                  ? 'line:${unit.lineInfo.getLocation(offset).lineNumber}'
+                  ? 'line:${unit.lineInfo!.getLocation(offset).lineNumber}'
                   : '',
               'class:${declaration.name}',
               'signature:${member.parameters.toString()}',
@@ -460,11 +507,11 @@ class Ctags {
               lines.add([
                 variable.name.name,
                 path.relative(file.path, from: root),
-                '/${memberSource}/;"',
+                '/$memberSource/;"',
                 'f',
                 'access:${variable.name.name[0] == '_' ? 'private' : 'public'}',
                 options['line-numbers'] as bool
-                    ? 'line:${unit.lineInfo.getLocation(member.offset).lineNumber}'
+                    ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
                     : '',
                 'class:${declaration.name}',
                 'type:${_parseFieldType(memberSource)}'
@@ -494,11 +541,11 @@ class Ctags {
             lines.add([
               member.name.name,
               path.relative(file.path, from: root),
-              '/${method.matchAsPrefix(memberSource)[0]}/;"',
+              '/${method.matchAsPrefix(memberSource)![0]}/;"',
               tag,
               'access:${member.name.name[0] == '_' ? 'private' : 'public'}',
               options['line-numbers'] as bool
-                  ? 'line:${unit.lineInfo.getLocation(member.offset).lineNumber}'
+                  ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
                   : '',
               'class:${declaration.name}',
               'signature:${tag == 'g' ? '' : member.parameters.toString()}',
@@ -513,26 +560,22 @@ class Ctags {
   }
 }
 
-void main([List<String> args]) {
+void main([List<String>? args]) {
   final parser = ArgParser();
 
   parser.addOption('output',
       abbr: 'o', help: 'Output file for tags (default: stdout)', valueHelp: 'FILE');
   parser.addOption('project',
       abbr: 'p', help: 'add separate category for project import directives');
-  parser.addFlag('follow-links',
-      help: 'Follow symbolic links (default: false)', negatable: false);
+  parser.addFlag('follow-links', help: 'Follow symbolic links (default: false)', negatable: false);
   parser.addFlag('include-hidden',
       help: 'Include hidden directories (default: false)', negatable: false);
   parser.addFlag('line-numbers',
-      abbr: 'l',
-      help: 'Add line numbers to extension fields (default: false)',
-      negatable: false);
-  parser.addFlag('skip-sort',
-      help: 'Skip sorting the output (default: false)', negatable: false);
+      abbr: 'l', help: 'Add line numbers to extension fields (default: false)', negatable: false);
+  parser.addFlag('skip-sort', help: 'Skip sorting the output (default: false)', negatable: false);
   parser.addFlag('help', abbr: 'h', help: 'Show this help', negatable: false);
 
-  final options = parser.parse(args);
+  final options = parser.parse(args!);
 
   if (options['help'] as bool) {
     print(
