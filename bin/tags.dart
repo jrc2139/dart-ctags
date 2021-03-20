@@ -137,7 +137,9 @@ class Ctags {
 
     // import, export, part, part of, library directives
     await Future.forEach(unit.directives, (Directive d) async {
-      late String tag, importDirective, display;
+      late String tag, display;
+
+      var importDirective = '';
 
       if (d is ImportDirective) {
         display = d.childEntities
@@ -294,7 +296,7 @@ class Ctags {
         });
       } else if (declaration is ExtensionDeclaration) {
         lines.add([
-          '${declaration.name!.name} on ${declaration.extendedType}',
+          '${declaration.name?.name ?? ''} on ${declaration.extendedType}',
           path.relative(file.path, from: root),
           '/${klass.matchAsPrefix(declaration.toSource())![0]}/;"',
           'X',
@@ -336,7 +338,7 @@ class Ctags {
               options['line-numbers'] as bool
                   ? 'line:${unit.lineInfo!.getLocation(member.offset).lineNumber}'
                   : '',
-              'extension:${declaration.name!.name} on ${declaration.extendedType}',
+              'extension:${declaration.name?.name ?? ''} on ${declaration.extendedType}',
               'signature:${tag == 'g' ? '' : member.parameters.toString()}',
               'type:${member.returnType.toString()}'
             ]);
