@@ -7,8 +7,8 @@ environment:
 executables:
     dart_ctags: tags
 dependencies:
-    analyzer: ^1.1.0 
+    analyzer: ^1.5.0 
     path: ^1.8.0 
-    args: ^2.0.0 
+    args: ^2.1.0 
 dev_dependencies:
     pedantic: ^1.11.0 
